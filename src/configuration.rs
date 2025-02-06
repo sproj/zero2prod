@@ -25,9 +25,8 @@ impl DatabaseSettings {
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     // initialize configuration reader
     let settings = config::Config::builder()
-        .add_source(config::File::new("config.yaml", config::FileFormat::Yaml)
-        )
+        .add_source(config::File::new("config.yaml", config::FileFormat::Yaml))
         .build()?;
-    
+
     settings.try_deserialize::<Settings>()
 }
