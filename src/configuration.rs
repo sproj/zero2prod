@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, Secret};
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application: ApplicationSettings
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -26,6 +26,12 @@ impl DatabaseSettings {
             self.database_name
         ))
     }
+}
+
+#[derive(serde::Deserialize)]
+struct ApplicationSettings {
+    host: String,
+    port: u16
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
