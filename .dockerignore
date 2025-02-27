@@ -4,5 +4,14 @@ tests/
 Dockerfile
 scripts/
 migrations/
+# Terraform files
 .terraform/
+*.tfstate
+*.tfstate.*
+.terraformrc
+terraform.rc
+*.tfvars
+!example.tfvars
+.terraform.lock.hcl
+crash.log
 terraform/.terraform
