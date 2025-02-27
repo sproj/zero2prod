@@ -4,3 +4,5 @@ tests/
 Dockerfile
 scripts/
 migrations/
+.terraform/
+terraform/.terraform
