@@ -17,5 +17,5 @@ data "terraform_remote_state" "foundation" {
 locals {
   vpc_id              = data.terraform_remote_state.foundation.outputs.vpc_id
   subnet_ids          = data.terraform_remote_state.foundation.outputs.public_subnet_ids
-  app_security_group_id = data.terraform_remote_state.foundation.outputs.app_security_group_id
+  common_security_group_id = data.terraform_remote_state.foundation.outputs.common_security_group_id
 }

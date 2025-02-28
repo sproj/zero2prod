@@ -1,56 +1,32 @@
-# IAM Role for ECS Task Execution
-resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "escTaskRunner"
+# Security group for Fargate tasks
+resource "aws_security_group" "app_sg" {
+  name        = "${var.app_name}-sg"
+  description = "Security group for ${var.app_name} Fargate tasks"
+  vpc_id      = data.terraform_remote_state.foundation.outputs.vpc_id
   
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ecs-tasks.amazonaws.com"
-      }
-    }]
-  })
+  # Allow inbound traffic to your application port
+  ingress {
+    protocol    = "tcp"
+    from_port   = var.container_port
+    to_port     = var.container_port
+    cidr_blocks = ["${var.your_ip}/32"]
+    description = "Allow inbound traffic to application port"
+  }
+  
+  # Allow all outbound traffic
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
   
   tags = {
-    Name = "${var.app_name}-ecs-task-execution-role"
+    Name        = "${var.app_name}-sg"
     Environment = var.environment
+    Managed     = "terraform"
+    Application = var.app_name
   }
 }
 
-# Custom policy for minimal permissions
-resource "aws_iam_policy" "ecs_task_execution_policy" {
-  name        = "${var.app_name}-task-execution-policy"
-  description = "Minimal permissions for ECS task execution"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "${aws_cloudwatch_log_group.app_logs.arn}:*"
-      }
-    ]
-  })
-}
-
-# Attach the custom policy
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = aws_iam_policy.ecs_task_execution_policy.arn
-}

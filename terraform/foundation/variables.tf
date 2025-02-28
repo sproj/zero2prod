@@ -7,7 +7,13 @@ variable "aws_region" {
 variable "environment" {
   description = "Environment name (e.g. dev, prod)"
   type        = string
-  default     = "dev"
+  default     = "production"
+}
+
+variable "app_name" {
+  description = "Name of the application"
+  type        = string
+  default     = "zero2prod"
 }
 
 variable "vpc_cidr" {
@@ -32,4 +38,16 @@ variable "app_port" {
   description = "Port the application will run on"
   type        = number
   default     = 8000
+}
+
+variable "create_nat_gateway" {
+  description = "Whether to create a NAT Gateway for private subnets"
+  type        = bool
+  default     = false
+}
+
+variable "create_alb" {
+  description = "Whether to create a load balancer"
+  type        = bool
+  default     = false
 }

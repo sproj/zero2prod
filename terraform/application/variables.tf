@@ -33,6 +33,12 @@ variable "desired_count" {
   default     = 1
 }
 
+variable "your_ip" {
+  description = "Your IP address for security group ingress"
+  type        = string
+  default     = "185.46.252.133"  # Better to restrict to your actual IP
+}
+
 variable "cpu" {
   description = "CPU units for the Fargate task (1024 = 1 vCPU)"
   type        = number

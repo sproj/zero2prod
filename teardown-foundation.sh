@@ -13,6 +13,12 @@ fi
 # Navigate to Terraform foundation directory
 cd terraform/foundation
 
+# check if later has been deployed before attempting teardown
+if [ ! -f .terraform/terraform.tfstate ]; then
+  echo "No Terraform state found. Has this layer been deployed?"
+  exit 1
+fi
+
 # Initialize Terraform
 echo "Initializing Terraform..."
 terraform init

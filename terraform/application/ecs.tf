@@ -1,7 +1,14 @@
-# CloudWatch Log Group
+# CloudWatch Log Group for application logs
 resource "aws_cloudwatch_log_group" "app_logs" {
   name              = "/ecs/${var.app_name}"
   retention_in_days = 30
+  
+  tags = {
+    Name        = "${var.app_name}-logs"
+    Environment = var.environment
+    Managed     = "terraform"
+    Application = var.app_name
+  }
 }
 
 # ECS Cluster
@@ -14,8 +21,10 @@ resource "aws_ecs_cluster" "app_cluster" {
   }
   
   tags = {
-    Name = "${var.app_name}-cluster"
+    Name        = "${var.app_name}-cluster"
     Environment = var.environment
+    Managed     = "terraform"
+    Application = var.app_name
   }
 }
 
@@ -26,7 +35,8 @@ resource "aws_ecs_task_definition" "app_task" {
   network_mode             = "awsvpc"
   cpu                      = var.cpu
   memory                   = var.memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  # Reference the execution role from the foundation layer
+  execution_role_arn       = data.terraform_remote_state.foundation.outputs.ecs_task_execution_role_arn
   
   container_definitions = jsonencode([{
     name      = "${var.app_name}-container"
@@ -48,17 +58,28 @@ resource "aws_ecs_task_definition" "app_task" {
       }
     }
     
+    # Environment variables
     environment = [
       {
         name  = "APP_ENVIRONMENT"
-        value = var.environment
+        value = "production"
       }
     ]
+    
+    # When you're ready to add secrets, you can include them here
+    # secrets = [
+    #   {
+    #     name      = "DATABASE_URL"
+    #     valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}-db-url::"
+    #   }
+    # ]
   }])
   
   tags = {
-    Name = "${var.app_name}-task-definition"
+    Name        = "${var.app_name}-task-definition"
     Environment = var.environment
+    Managed     = "terraform"
+    Application = var.app_name
   }
 }
 
@@ -71,17 +92,23 @@ resource "aws_ecs_service" "app_service" {
   desired_count   = var.desired_count
   
   network_configuration {
-    subnets          = local.subnet_ids
-    security_groups  = [local.app_security_group_id]
+    # Reference subnet IDs from the foundation layer
+    subnets         = data.terraform_remote_state.foundation.outputs.public_subnet_ids
+    security_groups = [aws_security_group.app_sg.id]
     assign_public_ip = true
   }
   
   lifecycle {
     ignore_changes = [
-      task_definition,
-      desired_count
+      task_definition, # Allow external updates to task definition
+      desired_count    # Allow manual scaling without Terraform reverting it
     ]
   }
   
-  depends_on = [aws_iam_role.ecs_task_execution_role]
+  tags = {
+    Name        = "${var.app_name}-service"
+    Environment = var.environment
+    Managed     = "terraform"
+    Application = var.app_name
+  }
 }

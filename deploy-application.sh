@@ -21,6 +21,14 @@ terraform init
 echo "Validating Terraform configuration..."
 terraform validate
 
+# Check if foundation outputs are accessible
+cd ../foundation
+if ! terraform output vpc_id &> /dev/null; then
+  echo "Foundation layer doesn't appear to be deployed. Please deploy it first."
+  exit 1
+fi
+cd ../application
+
 # Plan the deployment
 echo "Planning application deployment..."
 terraform plan -var-file="../environments/$ENVIRONMENT/application.tfvars" -out=tfplan
@@ -43,8 +51,9 @@ sleep 30
 
 # Get the public IP of the running task
 echo "Retrieving the public IP address of your application..."
-eval $(terraform output -raw public_ip_command)
+public_ip_cmd=$(terraform output -raw public_ip_command)
+public_ip=$(eval $public_ip_cmd)
 
 echo "Application deployment complete!"
-echo "You can now access your application at http://$(terraform output -raw public_ip):8000"
-echo "To test the health check endpoint: curl http://$(terraform output -raw public_ip):8000/health_check"
+echo "Application is running at: http://${public_ip}:8000"
+echo "To test the health check endpoint: curl http://${public_ip}:8000/health_check"
