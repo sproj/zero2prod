@@ -1,6 +1,104 @@
 # EFS File System for PostgreSQL data persistence
 resource "aws_efs_file_system" "postgres_data" {
-  creation_token = "${var.environment}"
+  creation_token = "${var.environment}-${var.app_name}-postgres-data"
+  encrypted      = true
+  
+  performance_mode = "generalPurpose"
+  throughput_mode  = "bursting"
+  
+  lifecycle_policy {
+    transition_to_ia = "AFTER_30_DAYS"
+  }
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.environment}-${var.app_name}-postgres-data"
+  })
+}
+
+# Security group for EFS access
+resource "aws_security_group" "efs_sg" {
+  name        = "${var.environment}-efs-sg"
+  description = "Allow EFS access from application containers"
+  vpc_id      = aws_vpc.main.id
+  
+  ingress {
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_sg.id]
+    description     = "Allow NFS traffic from application security group"
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.environment}-efs-sg"
+  })
+}
+
+# Mount targets in each subnet to provide access to the EFS file system
+resource "aws_efs_mount_target" "postgres_data" {
+  count           = length(var.availability_zones)
+  file_system_id  = aws_efs_file_system.postgres_data.id
+  subnet_id       = aws_subnet.public[count.index].id
+  security_groups = [aws_security_group.efs_sg.id]
+}
+
+# Access point for PostgreSQL data to provide isolation and proper permissions
+resource "aws_efs_access_point" "postgres_data" {
+  file_system_id = aws_efs_file_system.postgres_data.id
+  
+  posix_user {
+    gid = 999  # postgres group ID in default Docker postgres image
+    uid = 999  # postgres user ID in default Docker postgres image
+  }
+  
+  root_directory {
+    path = "/postgres_data"
+    creation_info {
+      owner_gid   = 999
+      owner_uid   = 999
+      permissions = "700"
+    }
+  }
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.environment}-${var.app_name}-postgres-access-point"
+  })
+}
+
+# Create more restrictive file system policy for the EFS
+resource "aws_efs_file_system_policy" "postgres_data" {
+  file_system_id = aws_efs_file_system.postgres_data.id
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid = "AllowAccessFromECS"
+        Effect = "Allow"
+        Principal = {
+          AWS = "*"
+        }
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite"
+        ]
+        Resource = aws_efs_file_system.postgres_data.arn
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalArn": aws_iam_role.ecs_task_execution_role.arn
+          }
+        }
+      }
+    ]
+  })
 }
 
 # Add backup for the EFS file system
@@ -84,103 +182,4 @@ output "efs_access_point_id" {
 output "efs_security_group_id" {
   description = "The ID of the security group for EFS access"
   value       = aws_security_group.efs_sg.id
-}-${var.app_name}-postgres-data"
-  encrypted      = true
-  
-  performance_mode = "generalPurpose"
-  throughput_mode  = "bursting"
-  
-  lifecycle_policy {
-    transition_to_ia = "AFTER_30_DAYS"
-  }
-  
-  tags = merge(local.common_tags, {
-    Name = "${var.environment}-${var.app_name}-postgres-data"
-  })
-}
-
-# Security group for EFS access
-resource "aws_security_group" "efs_sg" {
-  name        = "${var.environment}-efs-sg"
-  description = "Allow EFS access from application containers"
-  vpc_id      = aws_vpc.main.id
-  
-  ingress {
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app_sg.id]
-    description     = "Allow NFS traffic from application security group"
-  }
-  
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound traffic"
-  }
-  
-  tags = merge(local.common_tags, {
-    Name = "${var.environment}-efs-sg"
-  })
-}
-
-# Mount targets in each subnet to provide access to the EFS file system
-resource "aws_efs_mount_target" "postgres_data" {
-  count           = length(var.availability_zones)
-  file_system_id  = aws_efs_file_system.postgres_data.id
-  subnet_id       = aws_subnet.public[count.index].id
-  security_groups = [aws_security_group.efs_sg.id]
-}
-
-# Access point for PostgreSQL data to provide isolation and proper permissions
-resource "aws_efs_access_point" "postgres_data" {
-  file_system_id = aws_efs_file_system.postgres_data.id
-  
-  posix_user {
-    gid = 999  # postgres group ID in default Docker postgres image
-    uid = 999  # postgres user ID in default Docker postgres image
-  }
-  
-  root_directory {
-    path = "/postgres_data"
-    creation_info {
-      owner_gid   = 999
-      owner_uid   = 999
-      permissions = "700"
-    }
-  }
-  
-  tags = merge(local.common_tags, {
-    Name = "${var.environment}-${var.app_name}-postgres-access-point"
-  })
-}
-
-# Create more restrictive backup policies for the EFS access point
-resource "aws_efs_file_system_policy" "postgres_data" {
-  file_system_id = aws_efs_file_system.postgres_data.id
-  
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid = "AllowAccessFromECS"
-        Effect = "Allow"
-        Principal = {
-          AWS = "*"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite"
-        ]
-        Resource = aws_efs_file_system.postgres_data.arn
-        Condition = {
-          StringEquals = {
-            "aws:PrincipalArn": aws_iam_role.ecs_task_execution_role.arn
-          }
-        }
-      }
-    ]
-  })
 }
