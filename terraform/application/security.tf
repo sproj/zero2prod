@@ -22,11 +22,9 @@ resource "aws_security_group" "app_sg" {
     description = "Allow all outbound traffic"
   }
   
-  tags = {
+  tags = merge(local.common_tags, {
     Name        = "${var.app_name}-sg"
-    Environment = var.environment
-    Managed     = "terraform"
     Application = var.app_name
-  }
+  })
 }
 

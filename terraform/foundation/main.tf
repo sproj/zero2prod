@@ -33,3 +33,13 @@ resource "aws_security_group" "app_sg" {
     Environment = var.environment
   }
 }
+
+# Define common tags to be used across all resources
+locals {
+  common_tags = {
+    Project     = "zero2prod"
+    Environment = var.environment
+    Managed     = "terraform"
+    Layer       = "foundation"
+  }
+}

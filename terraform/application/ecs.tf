@@ -1,36 +1,6 @@
-# CloudWatch Log Group for application logs
-resource "aws_cloudwatch_log_group" "app_logs" {
-  name              = "/ecs/${var.app_name}"
-  retention_in_days = 30
-  
-  tags = {
-    Name        = "${var.app_name}-logs"
-    Environment = var.environment
-    Managed     = "terraform"
-    Application = var.app_name
-  }
-}
-
-# ECS Cluster
-resource "aws_ecs_cluster" "app_cluster" {
-  name = "${var.app_name}-cluster"
-  
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
-  
-  tags = {
-    Name        = "${var.app_name}-cluster"
-    Environment = var.environment
-    Managed     = "terraform"
-    Application = var.app_name
-  }
-}
-
 # ECS Task Definition
 resource "aws_ecs_task_definition" "app_task" {
-  family                   = var.app_name
+  family                   = "${var.environment}-${var.app_name}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.cpu
@@ -52,7 +22,7 @@ resource "aws_ecs_task_definition" "app_task" {
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.app_logs.name
+        "awslogs-group"         = data.terraform_remote_state.foundation.outputs.cloudwatch_log_group_name
         "awslogs-region"        = var.aws_region
         "awslogs-stream-prefix" = "ecs"
       }
@@ -65,14 +35,6 @@ resource "aws_ecs_task_definition" "app_task" {
         value = "production"
       }
     ]
-    
-    # When you're ready to add secrets, you can include them here
-    # secrets = [
-    #   {
-    #     name      = "DATABASE_URL"
-    #     valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}-db-url::"
-    #   }
-    # ]
   }])
   
   tags = {
@@ -80,22 +42,27 @@ resource "aws_ecs_task_definition" "app_task" {
     Environment = var.environment
     Managed     = "terraform"
     Application = var.app_name
+    Layer       = "application"
   }
 }
 
 # ECS Service
 resource "aws_ecs_service" "app_service" {
   name            = "${var.app_name}-service"
-  cluster         = aws_ecs_cluster.app_cluster.id
+  cluster         = data.terraform_remote_state.foundation.outputs.ecs_cluster_id
   task_definition = aws_ecs_task_definition.app_task.arn
   launch_type     = "FARGATE"
   desired_count   = var.desired_count
   
   network_configuration {
-    # Reference subnet IDs from the foundation layer
     subnets         = data.terraform_remote_state.foundation.outputs.public_subnet_ids
     security_groups = [aws_security_group.app_sg.id]
     assign_public_ip = true
+  }
+  
+  # Optional service discovery integration
+  service_registries {
+    registry_arn = aws_service_discovery_service.app.arn
   }
   
   lifecycle {
@@ -105,10 +72,33 @@ resource "aws_ecs_service" "app_service" {
     ]
   }
   
-  tags = {
+  tags = merge(local.common_tags, {
     Name        = "${var.app_name}-service"
-    Environment = var.environment
-    Managed     = "terraform"
     Application = var.app_name
+  })
+}
+
+# Service Discovery - register service in the foundation namespace
+resource "aws_service_discovery_service" "app" {
+  name = var.app_name
+  
+  dns_config {
+    namespace_id = data.terraform_remote_state.foundation.outputs.service_discovery_namespace_id
+    
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+    
+    routing_policy = "MULTIVALUE"
   }
+  
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+  
+  tags = merge(local.common_tags, {
+    Name        = "${var.app_name}-discovery"
+    Application = var.app_name
+  })
 }

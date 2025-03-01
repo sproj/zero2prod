@@ -19,3 +19,13 @@ locals {
   subnet_ids          = data.terraform_remote_state.foundation.outputs.public_subnet_ids
   common_security_group_id = data.terraform_remote_state.foundation.outputs.common_security_group_id
 }
+
+# Define common tags to be used across all application resources
+locals {
+  common_tags = {
+    Project     = "zero2prod"
+    Environment = var.environment
+    Managed     = "terraform"
+    Layer       = "application"
+  }
+}

@@ -21,14 +21,6 @@ terraform init
 echo "Validating Terraform configuration..."
 terraform validate
 
-# Check if foundation outputs are accessible
-cd ../foundation
-if ! terraform output vpc_id &> /dev/null; then
-  echo "Foundation layer doesn't appear to be deployed. Please deploy it first."
-  exit 1
-fi
-cd ../application
-
 # Plan the deployment
 echo "Planning application deployment..."
 terraform plan -var-file="../environments/$ENVIRONMENT/application.tfvars" -out=tfplan

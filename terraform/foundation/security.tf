@@ -12,11 +12,9 @@ resource "aws_security_group" "common" {
     description = "Allow all outbound traffic"
   }
   
-  tags = {
+  tags = merge(local.common_tags, {
     Name        = "${var.environment}-common-sg"
-    Environment = var.environment
-    Managed     = "terraform"
-  }
+  })
 }
 
 # IAM Role for ECS Task Execution - Fundamental for ECS tasks
@@ -34,11 +32,9 @@ resource "aws_iam_role" "ecs_task_execution_role" {
     }]
   })
   
-  tags = {
+  tags = merge(local.common_tags, {
     Name        = "${var.environment}-ecs-task-execution-role"
-    Environment = var.environment
-    Managed     = "terraform"
-  }
+  })
 }
 
 # Custom policy with all necessary permissions
