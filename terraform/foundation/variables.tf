@@ -51,3 +51,9 @@ variable "create_alb" {
   type        = bool
   default     = false
 }
+
+variable "create_backups" {
+  description = "Whether to create AWS Backup plans for resources"
+  type        = bool
+  default     = false  # Default to false to avoid extra costs in development
+}

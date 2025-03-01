@@ -24,15 +24,44 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 RUN apt-get update -y \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
-
+    # Add PostgreSQL client tools for health checks and scripts
+    postgresql-client \
+    # Add AWS CLI for backup scripts (optional)
+    curl unzip \
     # Clean up
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
+# Install AWS CLI (uncomment if needed for S3 backups)
+# RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+#     && unzip awscliv2.zip \
+#     && ./aws/install \
+#     && rm -rf aws awscliv2.zip
+
+# Copy our compiled binary
 COPY --from=builder /app/target/release/zero2prod zero2prod
+
+# Copy configuration
 COPY configuration configuration
+
+# Copy database migration files
+COPY migrations migrations
+
+# Copy our scripts
+COPY container-scripts/init-db-connection.sh .
+COPY container-scripts/postgres-backup.sh .
+COPY container-scripts/postgres-restore.sh .
+COPY container-scripts/postgres-init.sh .
+
+# Ensure scripts are executable
+RUN chmod +x *.sh
+
+# Create directory for potential backups
+RUN mkdir -p /var/lib/postgresql/backups
 
 ENV APP_ENVIRONMENT production
 
-ENTRYPOINT ["./zero2prod"]
+# Use our initialization script as the entrypoint
+ENTRYPOINT ["./init-db-connection.sh"]
+CMD ["./zero2prod"]

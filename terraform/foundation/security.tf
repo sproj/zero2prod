@@ -62,6 +62,18 @@ resource "aws_iam_policy" "ecs_task_execution_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "*"  # This would be more specific in the application layer
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameters",
+          "ssm:GetParameter",
+          "kms:Decrypt"
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.environment}/${var.app_name}/*",
+          "arn:aws:kms:${var.aws_region}:*:key/*"
+        ]
       }
     ]
   })
