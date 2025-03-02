@@ -71,7 +71,7 @@ resource "aws_iam_policy" "ecs_task_execution_policy" {
           "kms:Decrypt"
         ]
         Resource = [
-          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.environment}/${var.app_name}/*",
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.environment}/${var.app_name}*/*",
           "arn:aws:kms:${var.aws_region}:*:key/*"
         ]
       }
