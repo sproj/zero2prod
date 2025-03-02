@@ -90,7 +90,7 @@ resource "aws_efs_file_system_policy" "postgres_data" {
           "elasticfilesystem:ClientMount",
           "elasticfilesystem:ClientWrite"
         ]
-        Resource = aws_efs_file_system.postgres_data.arn
+        Resource = "*" #aws_efs_file_system.postgres_data.arn
         Condition = {
           StringEquals = {
             "aws:PrincipalArn": aws_iam_role.ecs_task_execution_role.arn
