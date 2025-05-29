@@ -2,14 +2,6 @@
 set -x
 set -eo pipefail
 
-if ! [ -x "$(command -v sqlx)" ]; then
-  echo >&2 "Error: sqlx is not installed."
-  echo >&2 "Use:"
-  echo >&2 "    cargo install --version='~0.8' sqlx-cli --no-default-features --features rustls,postgres"
-  echo >&2 "to install it."
-  exit 1
-fi
-
 # Check if a custom parameter has been set, otherwise use default values
 DB_PORT="${DB_PORT:=5432}"
 SUPERUSER="${SUPERUSER:=postgres}"
@@ -62,10 +54,19 @@ fi
 
 >&2 echo "Postgres is up and running on port ${DB_PORT} - running migrations now!"
 
-# Create the application database
-DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@localhost:${DB_PORT}/${APP_DB_NAME}
-export DATABASE_URL
-sqlx database create
-sqlx migrate run
+  # Create the application database using psql directly
+  PGPASSWORD="${APP_USER_PWD}" createdb \
+      --host=localhost \
+      --port="${DB_PORT}" \
+      --username="${APP_USER}" \
+      "${APP_DB_NAME}"
+
+  # Run migrations using psql directly
+  PGPASSWORD="${APP_USER_PWD}" psql \
+      --host=localhost \
+      --port="${DB_PORT}" \
+      --username="${APP_USER}" \
+      --dbname="${APP_DB_NAME}" \
+      --file=migrations/20250130200119_create_subscriptions_table.sql
 
 >&2 echo "Postgres has been migrated, ready to go!"
