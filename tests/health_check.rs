@@ -1,6 +1,7 @@
-use secrecy::{ExposeSecret, Secret};
-use sqlx::{Connection, Executor, PgConnection, PgPool};
+use deadpool_postgres::{Config, Pool, Runtime};
+use secrecy::ExposeSecret;
 use std::{net::TcpListener, sync::LazyLock};
+use tokio_postgres::NoTls;
 use uuid::Uuid;
 use zero2prod::{
     configuration::{get_configuration, DatabaseSettings},
@@ -26,7 +27,7 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 
 pub struct TestApp {
     pub address: String,
-    pub db_pool: PgPool,
+    pub db_pool: Pool,
 }
 
 #[tokio::test]
@@ -65,13 +66,15 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     // Assert
     assert_eq!(200, response.status().as_u16());
 
-    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
-        .fetch_one(&app.db_pool)
+    let client = app.db_pool.get().await.expect("Failed to get client");
+    let rows = client
+        .query("SELECT email, name FROM subscriptions", &[])
         .await
         .expect("Failed to fetch saved subscription.");
 
-    assert_eq!("ursula_le_guin@gmail.com", saved.email);
-    assert_eq!("le guin", saved.name);
+    let saved = &rows[0];
+    assert_eq!("ursula_le_guin@gmail.com", saved.get::<_, String>("email"));
+    assert_eq!("le guin", saved.get::<_, String>("name"));
 }
 
 #[tokio::test]
@@ -131,29 +134,66 @@ async fn spawn_app() -> TestApp {
     }
 }
 
-pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+// ===================================================
+
+async fn create_database(config: &DatabaseSettings) {
+    // Connect to postgres database to create our test database
+    let connection_string = format!(
+        "postgres://postgres:password@{}:{}/postgres",
+        config.host, config.port
+    );
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Spawn connection handler
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    // Create the test database
+    let query = format!("CREATE DATABASE \"{}\"", config.database_name);
+    client
+        .execute(&query, &[])
+        .await
+        .expect("Failed to create database");
+}
+
+async fn run_migrations(pool: &Pool) {
+    let client = pool.get().await.expect("Failed to get client");
+
+    // Read and execute your migration file
+    let migration_sql =
+        std::fs::read_to_string("migrations/20250130200119_create_subscriptions_table.sql")
+            .expect("Failed to read migration file");
+
+    client
+        .execute(&migration_sql, &[])
+        .await
+        .expect("Failed to execute migration");
+}
+
+pub async fn configure_database(config: &DatabaseSettings) -> Pool {
     // Create database
-    let maintenance_settings = DatabaseSettings {
-        database_name: "postgres".to_string(),
-        username: "postgres".to_string(),
-        password: Secret::new("password".to_string()),
-        ..config.clone()
-    };
-    let mut connection =
-        PgConnection::connect(&maintenance_settings.connection_string().expose_secret())
-            .await
-            .expect("Failed to connect to Postgres");
-    connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
-        .await
-        .expect("Failed to create database.");
-    // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres.");
-    sqlx::migrate!("./migrations")
-        .run(&connection_pool)
-        .await
-        .expect("Failed to migrate the database");
-    connection_pool
+    create_database(config).await;
+
+    // Create pool for the new database
+    let mut cfg = Config::new();
+    cfg.host = Some(config.host.clone());
+    cfg.port = Some(config.port);
+    cfg.user = Some(config.username.clone());
+    cfg.password = Some(config.password.expose_secret().clone());
+    cfg.dbname = Some(config.database_name.clone());
+
+    let pool = cfg
+        .create_pool(Some(Runtime::Tokio1), NoTls)
+        .expect("Failed to create connection pool");
+
+    // Run migrations
+    run_migrations(&pool).await;
+
+    pool
 }
