@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zero2prod
+  namespace: zero2prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zero2prod
+  template:
+    metadata:
+      labels:
+        app: zero2prod
+    spec:
+      containers:
+        - name: zero2prod
+          image: zero2prod:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: config
+              mountPath: /app/configuration
+          env:
+            - name: APP_APPLICATION__HOST
+              value: 0.0.0.0
+            - name: APP_APPLICATION__PORT
+              value: "8000"
+      volumes:
+        - name: config
+          configMap:
+            name: zero2prod-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zero2prod-service
+  namespace: zero2prod
+spec:
+  selector:
+    app: zero2prod
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort
