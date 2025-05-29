@@ -50,23 +50,26 @@ then
   # Grant create db privileges to the app user
   GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
   docker exec -it "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -c "${GRANT_QUERY}"
-fi
+
+
 
 >&2 echo "Postgres is up and running on port ${DB_PORT} - running migrations now!"
 
   # Create the application database using psql directly
-  PGPASSWORD="${APP_USER_PWD}" createdb \
-      --host=localhost \
-      --port="${DB_PORT}" \
-      --username="${APP_USER}" \
-      "${APP_DB_NAME}"
+  docker exec "${CONTAINER_NAME}" createdb -U "${SUPERUSER}" "${APP_DB_NAME}"
 
-  # Run migrations using psql directly
-  PGPASSWORD="${APP_USER_PWD}" psql \
-      --host=localhost \
-      --port="${DB_PORT}" \
-      --username="${APP_USER}" \
-      --dbname="${APP_DB_NAME}" \
-      --file=migrations/20250130200119_create_subscriptions_table.sql
+  # Grant schema permissions
+  SCHEMA_GRANT_QUERY="GRANT CREATE ON SCHEMA public TO ${APP_USER};"
+  docker exec -it "${CONTAINER_NAME}" psql -U "${SUPERUSER}" -d "${APP_DB_NAME}" -c "${SCHEMA_GRANT_QUERY}"
+  
+  docker exec "${CONTAINER_NAME}" psql -U "${APP_USER}" -d "${APP_DB_NAME}" -c "
+  CREATE TABLE subscriptions(
+      id uuid NOT NULL,
+      PRIMARY KEY (id),
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      subscribed_at timestamptz NOT NULL
+  );"
 
 >&2 echo "Postgres has been migrated, ready to go!"
+fi
