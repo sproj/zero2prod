@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  namespace: zero2prod
+spec:
+  template:
+    spec:
+      containers:
+        - name: migration
+          image: postgres:15
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              until pg_isready -h postgres-service -p 5432 -U app; do
+                echo "Waiting for database..."
+                sleep 2
+              done
+              echo "Database is ready, running migration..."
+              PGPASSWORD=secret psql -h postgres-service -U app -d newsletter -c "
+              CREATE TABLE IF NOT EXISTS subscriptions(
+                  id uuid NOT NULL,
+                  PRIMARY KEY (id),
+                  email TEXT NOT NULL UNIQUE,
+                  name TEXT NOT NULL,
+                  subscribed_at timestamptz NOT NULL
+              );"
+              echo "Migration completed successfully!"
+      restartPolicy: Never
+  backoffLimit: 4
