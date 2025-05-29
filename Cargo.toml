@@ -31,3 +31,7 @@ deadpool-postgres = "0.12"
 
 [dev-dependencies]
 reqwest = "0.12"
+
+[[test]]
+name = "health_check"
+path = "tests/health_check.rs"
