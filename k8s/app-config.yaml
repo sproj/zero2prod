@@ -7,10 +7,13 @@ data:
   base.yaml: |
     application:
       port: 8000
-      host: 0.0.0.0
     database:
-      host: "postgres-service"
       port: 5432
       username: "app"
       password: "secret"
       database_name: "newsletter"
+  minikube.yaml: |
+    application:
+      host: 0.0.0.0
+    database:
+      host: "postgres-service"
