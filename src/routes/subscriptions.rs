@@ -3,6 +3,8 @@ use chrono::Utc;
 use deadpool_postgres::Pool;
 use uuid::Uuid;
 
+use crate::domain::{NewSubscriber, SubscriberName};
+
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
@@ -18,7 +20,14 @@ pub struct FormData {
     )
 )]
 pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<Pool>) -> HttpResponse {
-    match insert_subscriber(&pool, &form).await {
+    // web::Form is a wrapper around `FormData`
+    // `form.0` gives us access to the underlying Formdata
+    let new_subscriber = NewSubscriber {
+        email: form.0.email,
+        name: SubscriberName::parse(form.0.name),
+    };
+
+    match insert_subscriber(&pool, &new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -29,11 +38,11 @@ pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<Pool>) -> Http
 
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(form, pool)
+    skip(new_subscriber, pool)
 )]
 pub async fn insert_subscriber(
     pool: &Pool,
-    form: &FormData,
+    new_subscriber: &NewSubscriber,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = pool.get().await?;
     client
@@ -42,15 +51,17 @@ pub async fn insert_subscriber(
     INSERT INTO subscriptions (id, email, name, subscribed_at)
     VALUES ($1, $2, $3, $4)
     "#,
-            &[&Uuid::new_v4(), &form.email, &form.name, &Utc::now()],
+            &[
+                &Uuid::new_v4(),
+                &new_subscriber.email,
+                &new_subscriber.name.as_ref(),
+                &Utc::now(),
+            ],
         )
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
             e
-            // Using the `?` operator to return early
-            // if the function failed, returning a sqlx::Error
-            // We will talk about error handling in depth later!
         })?;
     Ok(())
 }
