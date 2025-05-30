@@ -59,6 +59,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
 /// The possible runtime environment for our application.
 pub enum Environment {
     Local,
+    Minikube,
     Production,
 }
 
@@ -66,6 +67,7 @@ impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Local => "local",
+            Environment::Minikube => "minikube",
             Environment::Production => "production",
         }
     }
@@ -77,10 +79,11 @@ impl TryFrom<String> for Environment {
     fn try_from(s: String) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
             "local" => Ok(Self::Local),
+            "minikube" => Ok(Self::Minikube),
             "production" => Ok(Self::Production),
             other => Err(format!(
                 "{} is not a supported environment. \
-                Use either `local` or `production`.",
+                Use either `local`, `minikube` or `production`.",
                 other
             )),
         }

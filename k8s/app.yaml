@@ -23,6 +23,8 @@ spec:
             - name: config
               mountPath: /app/configuration
           env:
+            - name: APP_ENVIRONMENT
+              value: "minikube"
             - name: APP_APPLICATION__HOST
               value: 0.0.0.0
             - name: APP_APPLICATION__PORT
