@@ -128,7 +128,6 @@ impl TestApp {
         use std::net::TcpListener;
         use std::sync::LazyLock;
         use zero2prod::{
-            configuration::get_configuration,
             startup::run,
             telemetry::{get_subscriber, init_subscriber},
         };
