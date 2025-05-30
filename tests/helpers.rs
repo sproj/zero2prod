@@ -1,8 +1,6 @@
 use deadpool_postgres::{Config, Pool, Runtime};
-use secrecy::{ExposeSecret, Secret};
-use tokio_postgres::{Client, Connection, NoTls};
+use tokio_postgres::NoTls;
 use uuid::Uuid;
-use zero2prod::configuration::DatabaseSettings;
 
 pub struct TestDatabase {
     pub database_name: String,
