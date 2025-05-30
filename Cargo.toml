@@ -29,6 +29,8 @@ postgres = { version = "0.19", features = ["with-uuid-1", "with-chrono-0_4"] }
 tokio-postgres = "0.7"
 deadpool-postgres = "0.12"
 
+unicode-segmentation = "1"
+
 [dev-dependencies]
 reqwest = "0.12"
 
