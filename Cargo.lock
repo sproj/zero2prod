@@ -3046,6 +3046,7 @@ dependencies = [
  "reqwest",
  "secrecy",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-postgres",
  "tracing",
