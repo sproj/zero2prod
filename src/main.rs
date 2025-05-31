@@ -3,6 +3,7 @@ use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use tokio_postgres::NoTls;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::email_client::EmailClient;
 use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -16,13 +17,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create database connection pool
     let connection_pool = create_configuration_pool(&configuration.database)?;
 
+    // Build an `EmailClient` using `configuration`
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address");
+
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+
     let address = format!(
         "{}:{}",
         configuration.application.host, configuration.application.port
     );
 
     let listener = TcpListener::bind(address)?;
-    Ok(run(listener, connection_pool)?.await?)
+    Ok(run(listener, connection_pool, email_client)?.await?)
 }
 
 fn create_configuration_pool(
