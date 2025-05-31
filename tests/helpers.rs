@@ -149,7 +149,7 @@ impl TestApp {
         });
         LazyLock::force(&TRACING);
 
-        let mut configuration = get_configuration().expect("Failed to read configuration");
+        let configuration = get_configuration().expect("Failed to read configuration");
         // Setup test database
         let db = TestDatabase::new().await;
 
@@ -158,7 +158,11 @@ impl TestApp {
             .email_client
             .sender()
             .expect("Invalid sender email address.");
-        let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+        let email_client = EmailClient::new(
+            configuration.email_client.base_url,
+            sender_email,
+            configuration.email_client.authorization_token,
+        );
 
         // Setup application
         let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
