@@ -1,6 +1,7 @@
 use deadpool_postgres::{Config, Pool, Runtime};
 use tokio_postgres::NoTls;
 use uuid::Uuid;
+use zero2prod::{configuration::get_configuration, email_client::EmailClient};
 
 pub struct TestDatabase {
     pub database_name: String,
@@ -148,15 +149,23 @@ impl TestApp {
         });
         LazyLock::force(&TRACING);
 
+        let mut configuration = get_configuration().expect("Failed to read configuration");
         // Setup test database
         let db = TestDatabase::new().await;
+
+        // Build a new email client
+        let sender_email = configuration
+            .email_client
+            .sender()
+            .expect("Invalid sender email address.");
+        let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
 
         // Setup application
         let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
         let port = listener.local_addr().unwrap().port();
         let address = format!("http://127.0.0.1:{}", port);
 
-        let server = run(listener, db.pool.clone()).expect("Failed to bind address");
+        let server = run(listener, db.pool.clone(), email_client).expect("Failed to bind address");
         let _ = tokio::spawn(server);
 
         TestApp {
