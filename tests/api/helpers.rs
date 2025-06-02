@@ -170,15 +170,29 @@ impl TestApp {
         // Setup application
         let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
         let port = listener.local_addr().unwrap().port();
-        let address = format!("http://127.0.0.1:{}", port);
 
-        let server = run(listener, db.pool.clone(), email_client).expect("Failed to bind address");
-        let _ = tokio::spawn(server);
+        // let server = run(listener, db.pool.clone(), email_client).expect("Failed to bind address");
+        let application = Application::build(configuration.clone())
+            .await
+            .expect("Failed to build application");
+
+        let address = format!("http://127.0.0.1:{}", application.port());
+        let _ = tokio::spawn(application.run_until_stopped());
 
         TestApp {
             address,
             db_pool: db.pool.clone(),
             _db: db, // Database will be cleaned up when TestApp is dropped
         }
+    }
+
+    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/subscriptions", &self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request")
     }
 }
