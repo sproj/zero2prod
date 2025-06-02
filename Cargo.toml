@@ -43,6 +43,3 @@ features = ["json", "rustls-tls"]
 wiremock = "0.6"
 serde_json = "1"
 
-[[test]]
-name = "health_check"
-path = "tests/health_check.rs"
